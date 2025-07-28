@@ -53,7 +53,7 @@ from transformers import TrainingArguments, Trainer, DataCollatorWithPadding
 
 # A data collator will dynamically pad the texts to the length of the longest one in a batch
 data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
-save_and_eval_steps = 500 # Example: run every 500 steps
+save_and_eval_steps = 500  # or whatever value you use
 
 training_args = TrainingArguments(
     output_dir="./gemma-imdb-classifier",
@@ -62,14 +62,14 @@ training_args = TrainingArguments(
     per_device_eval_batch_size=16,
     num_train_epochs=2,
     weight_decay=0.01,
-    
-    # --- Ensure evaluation is enabled and matches saving frequency ---
-    do_eval=True,                       # Crucial: This enables evaluation
-    save_steps=save_and_eval_steps,     # Set saving frequency
-    eval_steps=save_and_eval_steps,     # Set evaluation frequency to match saving
-    # ----------------------------------------------------------------
-    
-    load_best_model_at_end=True,        # This now works because evaluation is on
+
+    do_eval=True,
+    evaluation_strategy="steps",         # <-- add this
+    save_strategy="steps",               # <-- and this
+    save_steps=save_and_eval_steps,
+    eval_steps=save_and_eval_steps,
+
+    load_best_model_at_end=True,
     push_to_hub=False,
 )
 
