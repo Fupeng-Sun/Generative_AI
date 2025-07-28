@@ -59,15 +59,14 @@ steps_per_epoch = 100
 training_args = TrainingArguments(
     output_dir="./gemma-imdb-classifier", # Directory to save the model
     learning_rate=2e-5,
-    per_device_train_batch_size=16,  # You can increase this significantly on an H200
-    per_device_eval_batch_size=16,   # Same here
+    per_device_train_batch_size=16,
+    per_device_eval_batch_size=16,
     num_train_epochs=2,
     weight_decay=0.01,
-    evaluate_during_training=True,   # The older equivalent
-    eval_steps=steps_per_epoch,      # Explicitly set when to evaluate
-    save_steps=steps_per_epoch,      # Explicitly set when to save
+    evaluation_strategy="epoch",        # Replaces evaluate_during_training and eval_steps
+    save_strategy="epoch",              # Replaces save_steps for epoch-based saving
     load_best_model_at_end=True,
-    push_to_hub=False,               # Set to True to upload to Hugging Face Hub
+    push_to_hub=False,
 )
 
 # Initialize the Trainer
