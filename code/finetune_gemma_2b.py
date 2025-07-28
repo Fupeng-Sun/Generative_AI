@@ -53,6 +53,7 @@ from transformers import TrainingArguments, Trainer, DataCollatorWithPadding
 
 # A data collator will dynamically pad the texts to the length of the longest one in a batch
 data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+steps_per_epoch = 100
 
 # Define training arguments
 training_args = TrainingArguments(
@@ -62,8 +63,9 @@ training_args = TrainingArguments(
     per_device_eval_batch_size=16,   # Same here
     num_train_epochs=2,
     weight_decay=0.01,
-    evaluation_strategy="epoch",     # Evaluate at the end of each epoch
-    save_strategy="epoch",           # Save the model at the end of each epoch
+    evaluate_during_training=True,   # The older equivalent
+    eval_steps=steps_per_epoch,      # Explicitly set when to evaluate
+    save_steps=steps_per_epoch,      # Explicitly set when to save
     load_best_model_at_end=True,
     push_to_hub=False,               # Set to True to upload to Hugging Face Hub
 )
