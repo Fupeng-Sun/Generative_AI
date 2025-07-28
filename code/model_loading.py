@@ -14,7 +14,7 @@ id2label = {i: label for i, label in enumerate(labels)}
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 # Model ID from Hugging Face Hub
-model_id = "google/gemma-3-1b-it"
+model_id = "google/gemma-2b-it"
 
 # Load tokenizer
 tokenizer = AutoTokenizer.from_pretrained(model_id)
