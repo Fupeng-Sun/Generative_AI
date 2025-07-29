@@ -64,7 +64,7 @@ training_args = TrainingArguments(
     weight_decay=0.01,
 
     do_eval=True,
-    evaluation_strategy="steps",         # <-- add this
+    eval_strategy="steps",         # <-- add this
     save_strategy="steps",               # <-- and this
     save_steps=save_and_eval_steps,
     eval_steps=save_and_eval_steps,
