@@ -37,7 +37,10 @@ def preprocess_function(examples):
     return tokenizer(examples["text"], truncation=True)
 
 # Apply the function to the whole dataset
-tokenized_dataset = dataset.map(preprocess_function, batched=True)
+tokenized_dataset = dataset.map(
+    lambda examples: tokenizer(examples["text"], truncation=True, max_length=512), 
+    batched=True
+)
 
 # Fine-tuning with the Trainer API 
 import numpy as np
