@@ -9,6 +9,7 @@ from transformers import (
     Trainer,
     DataCollatorWithPadding,
 )
+from peft import LoraConfig, get_peft_model
 
 # Optional: Disable wandb logging if you have network issues
 os.environ["WANDB_DISABLED"] = "true"
@@ -43,7 +44,26 @@ model = AutoModelForSequenceClassification.from_pretrained(
 # Ensure the model's pad token ID is configured
 model.config.pad_token_id = tokenizer.pad_token_id
 
-# 3. Preprocess and Tokenize Data
+
+# 3. Apply LoRA PEFT
+# ============================================
+print("Applying LoRA configuration...")
+lora_config = LoraConfig(
+    r=16,  # The rank of the update matrices.
+    lora_alpha=32,  # The scaling factor for the update matrices.
+    target_modules=["q_proj", "v_proj"],  # Target the query and value projection layers
+    lora_dropout=0.05,
+    bias="none",
+    task_type="SEQ_CLS",  # Specify the task type for sequence classification
+)
+
+# Wrap the base model with get_peft_model
+model = get_peft_model(model, lora_config)
+# Print the number of trainable parameters
+model.print_trainable_parameters()
+
+
+# 4. Preprocess and Tokenize Data
 # ===============================
 print("Tokenizing dataset...")
 
@@ -53,7 +73,7 @@ def preprocess_function(examples):
 
 tokenized_dataset = dataset.map(preprocess_function, batched=True)
 
-# 4. Define Metrics and Training Configuration
+# 5. Define Metrics and Training Configuration
 # ============================================
 def compute_metrics(eval_pred):
     """Computes accuracy metric for evaluation."""
@@ -66,28 +86,28 @@ data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
 print("Setting up training arguments...")
 training_args = TrainingArguments(
-    output_dir="./gemma-imdb-classifier",
-    num_train_epochs=2,
+    output_dir="./gemma-imdb-classifier-lora", # Updated output directory
+    num_train_epochs=3, # LoRA can sometimes benefit from more epochs
     
-    # 🚀 Memory and Speed Optimizations
-    learning_rate=2e-5,
-    per_device_train_batch_size=4,      # Reduced batch size to prevent OOM
-    per_device_eval_batch_size=4,
-    gradient_accumulation_steps=4,      # Compensate for smaller per-device batch size
-    fp16=True,                          # Enable mixed-precision for speed and memory savings
+    # Memory and Speed Optimizations
+    learning_rate=2e-4, # LoRA can often use a higher learning rate
+    per_device_train_batch_size=8,  # We can now afford a larger batch size
+    per_device_eval_batch_size=8,
+    gradient_accumulation_steps=2,
+    fp16=True,  # Enable mixed-precision for speed and memory savings
     
-    # 📈 Logging and Saving Strategy
-    eval_strategy="epoch",        # Evaluate at the end of each epoch
-    save_strategy="epoch",              # Save at the end of each epoch
-    load_best_model_at_end=True,        # Load the best model when training is complete
+    # Logging and Saving Strategy
+    eval_strategy="epoch",
+    save_strategy="epoch",
+    load_best_model_at_end=True,
     
     # Other Parameters
     weight_decay=0.01,
     push_to_hub=False,
-    report_to="none",                   # Explicitly disable all reporting integrations
+    report_to="none",  # Explicitly disable all reporting integrations
 )
 
-# 5. Initialize and Run Trainer
+# 6. Initialize and Run Trainer
 # =============================
 trainer = Trainer(
     model=model,
@@ -100,11 +120,11 @@ trainer = Trainer(
 )
 
 # Start fine-tuning!
-print("Starting training...")
+print("Starting LoRA training...")
 trainer.train()
 
 # Save the final model
-print("Saving final model...")
-trainer.save_model("./final_model")
+print("Saving final LoRA model...")
+trainer.save_model("./final_model_lora")
 
 print("Training complete!")
