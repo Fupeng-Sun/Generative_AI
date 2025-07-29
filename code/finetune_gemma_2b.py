@@ -77,7 +77,7 @@ training_args = TrainingArguments(
     fp16=True,                          # Enable mixed-precision for speed and memory savings
     
     # 📈 Logging and Saving Strategy
-    evaluation_strategy="epoch",        # Evaluate at the end of each epoch
+    eval_strategy="epoch",        # Evaluate at the end of each epoch
     save_strategy="epoch",              # Save at the end of each epoch
     load_best_model_at_end=True,        # Load the best model when training is complete
     
