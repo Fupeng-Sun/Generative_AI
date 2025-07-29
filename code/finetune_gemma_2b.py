@@ -71,6 +71,7 @@ training_args = TrainingArguments(
 
     load_best_model_at_end=True,
     push_to_hub=False,
+    report_to="none", # <-- Add this line to disable wandb
 )
 
 # Initialize the Trainer
