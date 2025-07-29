@@ -1,83 +1,94 @@
-# Prepare the Dataset
+import numpy as np
+import os
 from datasets import load_dataset
+from sklearn.metrics import accuracy_score
+from transformers import (
+    AutoTokenizer,
+    AutoModelForSequenceClassification,
+    TrainingArguments,
+    Trainer,
+    DataCollatorWithPadding,
+)
 
-# Load the dataset
+# Optional: Disable wandb logging if you have network issues
+os.environ["WANDB_DISABLED"] = "true"
+
+# 1. Prepare the Dataset
+# ========================
+print("Loading and preparing dataset...")
 dataset = load_dataset("imdb")
 
-# Create label mappings
-labels = dataset["train"].features["label"].names # ["neg", "pos"]
+# Create label mappings required by the model
+labels = dataset["train"].features["label"].names  # ["neg", "pos"]
 num_labels = len(labels)
 label2id = {label: i for i, label in enumerate(labels)}
 id2label = {i: label for i, label in enumerate(labels)}
 
-# Load Model and Tokenizer
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-
-# Model ID from Hugging Face Hub
+# 2. Load Model and Tokenizer
+# ===========================
+print("Loading model and tokenizer...")
 model_id = "google/gemma-2b-it"
 
-# Load tokenizer
 tokenizer = AutoTokenizer.from_pretrained(model_id)
-# Gemma doesn't have a default pad token, so we set it to the end-of-sequence token
-tokenizer.pad_token = tokenizer.eos_token
+# Set a padding token if one doesn't exist
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
 
-# Load model with a classification head
 model = AutoModelForSequenceClassification.from_pretrained(
     model_id,
     num_labels=num_labels,
     id2label=id2label,
     label2id=label2id,
 )
-# The model's pad token id must match the tokenizer's
+# Ensure the model's pad token ID is configured
 model.config.pad_token_id = tokenizer.pad_token_id
 
-# Preprocess and Tokenize Data
+# 3. Preprocess and Tokenize Data
+# ===============================
+print("Tokenizing dataset...")
+
 def preprocess_function(examples):
-    # Tokenize the text. `truncation=True` ensures that long texts are cut to the model's max length.
-    return tokenizer(examples["text"], truncation=True)
+    """Tokenize the text, truncating to a maximum length."""
+    return tokenizer(examples["text"], truncation=True, max_length=512)
 
-# Apply the function to the whole dataset
-tokenized_dataset = dataset.map(
-    lambda examples: tokenizer(examples["text"], truncation=True, max_length=512), 
-    batched=True
-)
+tokenized_dataset = dataset.map(preprocess_function, batched=True)
 
-# Fine-tuning with the Trainer API 
-import numpy as np
-from sklearn.metrics import accuracy_score
-
+# 4. Define Metrics and Training Configuration
+# ============================================
 def compute_metrics(eval_pred):
+    """Computes accuracy metric for evaluation."""
     predictions, labels = eval_pred
-    # Get the class with the highest probability
     predictions = np.argmax(predictions, axis=1)
     return {"accuracy": accuracy_score(labels, predictions)}
 
-from transformers import TrainingArguments, Trainer, DataCollatorWithPadding
-
-# A data collator will dynamically pad the texts to the length of the longest one in a batch
+# Dynamically pads batches to the longest sequence
 data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
-save_and_eval_steps = 500  # or whatever value you use
 
+print("Setting up training arguments...")
 training_args = TrainingArguments(
     output_dir="./gemma-imdb-classifier",
-    learning_rate=2e-5,
-    per_device_train_batch_size=16,
-    per_device_eval_batch_size=16,
     num_train_epochs=2,
+    
+    # 🚀 Memory and Speed Optimizations
+    learning_rate=2e-5,
+    per_device_train_batch_size=4,      # Reduced batch size to prevent OOM
+    per_device_eval_batch_size=4,
+    gradient_accumulation_steps=4,      # Compensate for smaller per-device batch size
+    fp16=True,                          # Enable mixed-precision for speed and memory savings
+    
+    # 📈 Logging and Saving Strategy
+    evaluation_strategy="epoch",        # Evaluate at the end of each epoch
+    save_strategy="epoch",              # Save at the end of each epoch
+    load_best_model_at_end=True,        # Load the best model when training is complete
+    
+    # Other Parameters
     weight_decay=0.01,
-
-    do_eval=True,
-    eval_strategy="steps",         # <-- add this
-    save_strategy="steps",               # <-- and this
-    save_steps=save_and_eval_steps,
-    eval_steps=save_and_eval_steps,
-
-    load_best_model_at_end=True,
     push_to_hub=False,
-    report_to="none", # <-- Add this line to disable wandb
+    report_to="none",                   # Explicitly disable all reporting integrations
 )
 
-# Initialize the Trainer
+# 5. Initialize and Run Trainer
+# =============================
 trainer = Trainer(
     model=model,
     args=training_args,
@@ -89,7 +100,11 @@ trainer = Trainer(
 )
 
 # Start fine-tuning!
+print("Starting training...")
 trainer.train()
 
-# To save the final model
+# Save the final model
+print("Saving final model...")
 trainer.save_model("./final_model")
+
+print("Training complete!")
